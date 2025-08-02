@@ -77,8 +77,7 @@ void get_registered_descriptor_process(void* process_ptr)
     written = 0;
     rpc_get_string("descriptor_name", sizeof(descriptor_name), &params, descriptor_name, &written);
     if (written == 0 || !storage_key_name_valid(descriptor_name)) {
-        jade_process_reject_message(
-            process, CBOR_RPC_BAD_PARAMETERS, "Missing or invalid descriptor name parameter", NULL);
+        jade_process_reject_message(process, CBOR_RPC_BAD_PARAMETERS, "Missing or invalid descriptor name parameter");
         goto cleanup;
     }
 
@@ -90,14 +89,17 @@ void get_registered_descriptor_process(void* process_ptr)
         // Doesn't exist, corrupt or for another wallet
         JADE_LOGW("%s", errmsg);
         jade_process_reject_message(
-            process, CBOR_RPC_BAD_PARAMETERS, "Named descriptor wallet does not exist for this signer", NULL);
+            process, CBOR_RPC_BAD_PARAMETERS, "Named descriptor wallet does not exist for this signer");
         goto cleanup;
     }
 
     // Reply with this info
+    const size_t buflen = 1024 + (128 * descriptor_data.num_values);
+    uint8_t* const buf = JADE_MALLOC(buflen);
     const descriptor_details_t descriptor_details
         = { .descriptor_name = descriptor_name, .descriptor_data = &descriptor_data };
-    jade_process_reply_to_message_result(process->ctx, &descriptor_details, reply_registered_descriptor);
+    jade_process_reply_to_message_result(process->ctx, buf, buflen, &descriptor_details, reply_registered_descriptor);
+    free(buf);
 
     JADE_LOGI("Success");
 

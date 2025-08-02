@@ -10,8 +10,6 @@
 
 #ifdef CONFIG_DEBUG_MODE
 
-static const size_t QR_CBOR_OVERHEAD = 64;
-
 typedef struct {
     jade_process_t* process;
     bool check_qr; // check captured image is a valid qr code
@@ -96,11 +94,7 @@ static bool return_image_data(const size_t width, const size_t height, const uin
     }
 
     // All good, reply with the compressed image data
-    const size_t buflen = compressed_len + QR_CBOR_OVERHEAD;
-    uint8_t* buffer = JADE_MALLOC_PREFER_SPIRAM(buflen);
-    JADE_LOGI("Trying to send compressed captured image data, message buffer len: %u", buflen);
-    jade_process_reply_to_message_bytes(info->process->ctx, compressed, compressed_len, buffer, buflen);
-    free(buffer);
+    jade_process_reply_to_message_bytes(info->process->ctx, compressed, compressed_len);
 
     // Free the input message (to signal that we have been called and sent the reply)
     jade_process_free_current_message(info->process);
@@ -137,7 +131,7 @@ void debug_capture_image_data_process(void* process_ptr)
     // (We can detect as the callback frees the 'current message' on successful completion)
     if (HAS_CURRENT_MESSAGE(process)) {
         // The camera callback was not called - ie. camera screen was 'Exit'-ed.
-        jade_process_reject_message(process, CBOR_RPC_USER_CANCELLED, "User declined to capture image", NULL);
+        jade_process_reject_message(process, CBOR_RPC_USER_CANCELLED, "User declined to capture image");
     }
 
 cleanup:
@@ -158,8 +152,7 @@ void debug_scan_qr_process(void* process_ptr)
     const uint8_t* data = NULL;
     rpc_get_bytes_ptr("image", &params, &data, &len);
     if (!data || !len) {
-        jade_process_reject_message(
-            process, CBOR_RPC_BAD_PARAMETERS, "Failed to extract image data from parameters", NULL);
+        jade_process_reject_message(process, CBOR_RPC_BAD_PARAMETERS, "Failed to extract image data from parameters");
         goto cleanup;
     }
 
@@ -169,7 +162,7 @@ void debug_scan_qr_process(void* process_ptr)
     jade_process_free_on_exit(process, decompressed);
     const size_t decompressed_len = decompress_impl(data, len, decompressed, decompressed_buflen);
     if (!decompressed_len || decompressed_len != decompressed_buflen) {
-        jade_process_reject_message(process, CBOR_RPC_BAD_PARAMETERS, "Failed to decompress image data", NULL);
+        jade_process_reject_message(process, CBOR_RPC_BAD_PARAMETERS, "Failed to decompress image data");
         goto cleanup;
     }
 
@@ -185,8 +178,7 @@ void debug_scan_qr_process(void* process_ptr)
     }
 
     // Reply with the decoded data (empty if failed)
-    const bytes_info_t bytes_info = { .data = qr_data.data, .size = qr_data.len };
-    jade_process_reply_to_message_result(process->ctx, &bytes_info, cbor_result_bytes_cb);
+    jade_process_reply_to_message_bytes(process->ctx, qr_data.data, qr_data.len);
     JADE_LOGI("Success");
 
 cleanup:

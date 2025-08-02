@@ -250,7 +250,10 @@ void set_request_change_pin(bool change_pin);
 static void process_get_version_info_request(jade_process_t* process)
 {
     ASSERT_CURRENT_MESSAGE(process, "get_version_info");
-    jade_process_reply_to_message_result(process->ctx, &process->ctx.source, build_version_info_reply);
+
+    uint8_t buf[1024];
+    jade_process_reply_to_message_result(
+        process->ctx, buf, sizeof(buf), &process->ctx.source, build_version_info_reply);
 }
 
 // If the user has successfully authenticated over a given connection interface,
@@ -386,7 +389,7 @@ static void process_add_entropy_request(jade_process_t* process)
 
     if (!written) {
         jade_process_reject_message(
-            process, CBOR_RPC_BAD_PARAMETERS, "Failed to extract valid entropy bytes from parameters", NULL);
+            process, CBOR_RPC_BAD_PARAMETERS, "Failed to extract valid entropy bytes from parameters");
         goto cleanup;
     }
 
@@ -407,7 +410,7 @@ static void process_set_epoch_request(jade_process_t* process)
     const char* errmsg = NULL;
     const int errcode = params_set_epoch_time(&params, &errmsg);
     if (errcode) {
-        jade_process_reject_message(process, errcode, errmsg, NULL);
+        jade_process_reject_message(process, errcode, errmsg);
         goto cleanup;
     }
 
@@ -494,8 +497,7 @@ static void dispatch_message(jade_process_t* process)
             task_function = ota_process;
         } else {
             // Reject the message as hw locked
-            jade_process_reject_message(
-                process, CBOR_RPC_HW_LOCKED, "OTA is only allowed on new or logged-in device.", NULL);
+            jade_process_reject_message(process, CBOR_RPC_HW_LOCKED, "OTA is only allowed on new or logged-in device.");
         }
     } else if (IS_METHOD("ota_delta")) {
         if (ota_allowed(process->ctx.source)) {
@@ -506,7 +508,7 @@ static void dispatch_message(jade_process_t* process)
         } else {
             // Reject the message as hw locked
             jade_process_reject_message(
-                process, CBOR_RPC_HW_LOCKED, "OTA delta is only allowed on new or logged-in device.", NULL);
+                process, CBOR_RPC_HW_LOCKED, "OTA delta is only allowed on new or logged-in device.");
         }
 #ifdef CONFIG_DEBUG_MODE
     } else if (IS_METHOD("debug_selfcheck")) {
@@ -515,9 +517,12 @@ static void dispatch_message(jade_process_t* process)
         if (debug_selfcheck(process)) {
             const TickType_t end_time = xTaskGetTickCount();
             const uint64_t elapsed_time_ms = (end_time - start_time) * portTICK_PERIOD_MS;
-            jade_process_reply_to_message_result(process->ctx, &elapsed_time_ms, cbor_result_uint64_cb);
+
+            uint8_t buf[64];
+            jade_process_reply_to_message_result(
+                process->ctx, buf, sizeof(buf), &elapsed_time_ms, cbor_result_uint64_cb);
         } else {
-            jade_process_reject_message(process, CBOR_RPC_INTERNAL_ERROR, "ERROR", NULL);
+            jade_process_reject_message(process, CBOR_RPC_INTERNAL_ERROR, "ERROR");
         }
     } else if (IS_METHOD("debug_clean_reset")) {
         task_function = debug_clean_reset_process;
@@ -543,7 +548,7 @@ static void dispatch_message(jade_process_t* process)
         if (!KEYCHAIN_UNLOCKED_BY_MESSAGE_SOURCE(process)) {
             // Reject the message as hw locked
             jade_process_reject_message(
-                process, CBOR_RPC_HW_LOCKED, "Cannot process message - hardware locked or uninitialized", NULL);
+                process, CBOR_RPC_HW_LOCKED, "Cannot process message - hardware locked or uninitialized");
         } else if (IS_METHOD("register_otp")) {
             task_function = register_otp_process;
         } else if (IS_METHOD("get_otp_code")) {
@@ -595,10 +600,10 @@ static void dispatch_message(jade_process_t* process)
         } else if (IS_METHOD("ota_data") || IS_METHOD("ota_complete") || IS_METHOD("tx_input")
             || IS_METHOD("get_extended_data") || IS_METHOD("get_signature") || IS_METHOD("pin")) {
             // Method we only expect as part of a multi-message protocol
-            jade_process_reject_message(process, CBOR_RPC_PROTOCOL_ERROR, "Unexpected method", NULL);
+            jade_process_reject_message(process, CBOR_RPC_PROTOCOL_ERROR, "Unexpected method");
         } else {
             // Reject the message as unknown, and free message
-            jade_process_reject_message(process, CBOR_RPC_UNKNOWN_METHOD, "Unknown method", NULL);
+            jade_process_reject_message(process, CBOR_RPC_UNKNOWN_METHOD, "Unknown method");
         }
     }
 

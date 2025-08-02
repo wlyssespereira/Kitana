@@ -749,11 +749,25 @@ static void make_legal_page(link_activity_t* page_act, int legal_page)
     }
 #if defined(CONFIG_BOARD_TYPE_JADE_V1_1) || defined(CONFIG_BOARD_TYPE_JADE_V2)
     case 6: {
+        gui_view_node_t* hsplit;
+        gui_make_hsplit(&hsplit, GUI_SPLIT_RELATIVE, 3, 36, 10, 54);
+        gui_set_parent(hsplit, parent);
+
         Picture* const pic = get_picture(telecstart, telecend);
         gui_make_picture(&node, pic);
-        gui_set_parent(node, parent);
-        gui_set_align(node, GUI_ALIGN_CENTER, GUI_ALIGN_MIDDLE);
-        gui_set_padding(node, GUI_MARGIN_ALL_EQUAL, 12);
+        gui_set_parent(node, hsplit);
+        gui_set_align(node, GUI_ALIGN_RIGHT, GUI_ALIGN_MIDDLE);
+        gui_set_padding(node, GUI_MARGIN_ALL_DIFFERENT, 0, 8, 0, 0);
+
+        gui_make_text_font(&node, "O", TFT_WHITE, JADE_SYMBOLS_16x16_FONT);
+        gui_set_parent(node, hsplit);
+        gui_set_align(node, GUI_ALIGN_RIGHT, GUI_ALIGN_MIDDLE);
+        gui_set_padding(node, GUI_MARGIN_ALL_DIFFERENT, 0, 4, 2, 0);
+
+        gui_make_text(&node, "211-210802", TFT_WHITE);
+        gui_set_parent(node, hsplit);
+        gui_set_align(node, GUI_ALIGN_LEFT, GUI_ALIGN_MIDDLE);
+        gui_set_padding(node, GUI_MARGIN_ALL_DIFFERENT, 0, 0, 0, 4);
         break;
     }
 #endif

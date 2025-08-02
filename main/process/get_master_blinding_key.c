@@ -32,7 +32,7 @@ void get_master_blinding_key_process(void* process_ptr)
         if (onlyIfSilent || !await_yesno_activity("Blinding Key", question, 2, true, "blkstrm.com/blindingkey")) {
             JADE_LOGW("User declined to export master blinding key");
             jade_process_reject_message(
-                process, CBOR_RPC_USER_CANCELLED, "User declined to export master blinding key", NULL);
+                process, CBOR_RPC_USER_CANCELLED, "User declined to export master blinding key");
             goto cleanup;
         }
         JADE_LOGD("User pressed accept");
@@ -43,9 +43,8 @@ void get_master_blinding_key_process(void* process_ptr)
     // So we only return the relevant slice of the data.
     JADE_STATIC_ASSERT(sizeof(keychain_get()->master_unblinding_key) == HMAC_SHA512_LEN);
 
-    uint8_t buffer[256];
-    jade_process_reply_to_message_bytes(process->ctx, keychain_get()->master_unblinding_key + HMAC_SHA512_LEN / 2,
-        HMAC_SHA512_LEN / 2, buffer, sizeof(buffer));
+    jade_process_reply_to_message_bytes(
+        process->ctx, keychain_get()->master_unblinding_key + HMAC_SHA512_LEN / 2, HMAC_SHA512_LEN / 2);
     JADE_LOGI("Success");
 
 cleanup:

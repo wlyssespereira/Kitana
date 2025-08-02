@@ -6,6 +6,7 @@
 
 #ifdef CONFIG_IDF_TARGET_ESP32S3
 #include "../utils/cbor_rpc.h"
+#include "../utils/malloc_ext.h"
 #include "attestation/attestation.h"
 
 typedef struct {
@@ -41,11 +42,14 @@ void sign_attestation_and_send_reply(jade_process_t* process, const uint8_t* cha
             output.pubkey_pem, sizeof(output.pubkey_pem), &pem_written, output.ext_signature,
             sizeof(output.ext_signature), &output.ext_signature_len)
         || !pem_written || !output.ext_signature_len) {
-        jade_process_reject_message(process, CBOR_RPC_INTERNAL_ERROR, "Failed to sign attestation", NULL);
+        jade_process_reject_message(process, CBOR_RPC_INTERNAL_ERROR, "Failed to sign attestation");
     }
 
     // Reply with pubkey and signatures
-    jade_process_reply_to_message_result(process->ctx, &output, reply_attestation);
+    const size_t buflen = 2560;
+    uint8_t* const buf = JADE_MALLOC(buflen);
+    jade_process_reply_to_message_result(process->ctx, buf, buflen, &output, reply_attestation);
+    free(buf);
 }
 #endif // CONFIG_IDF_TARGET_ESP32S3
 
@@ -60,7 +64,7 @@ void sign_attestation_process(void* process_ptr)
 
 #ifdef CONFIG_IDF_TARGET_ESP32S3
     if (!attestation_initialised()) {
-        jade_process_reject_message(process, CBOR_RPC_INTERNAL_ERROR, "Attestation data not initialised", NULL);
+        jade_process_reject_message(process, CBOR_RPC_INTERNAL_ERROR, "Attestation data not initialised");
         goto cleanup;
     }
 
@@ -69,7 +73,7 @@ void sign_attestation_process(void* process_ptr)
     rpc_get_bytes_ptr("challenge", &params, &challenge, &challenge_len);
     if (challenge_len == 0) {
         jade_process_reject_message(
-            process, CBOR_RPC_BAD_PARAMETERS, "Failed to extract valid challenge from parameters", NULL);
+            process, CBOR_RPC_BAD_PARAMETERS, "Failed to extract valid challenge from parameters");
         goto cleanup;
     }
 
@@ -77,7 +81,7 @@ void sign_attestation_process(void* process_ptr)
     const char* message[] = { "Sign Genuine Check?" };
     if (!await_yesno_activity("Genuine Check", message, 1, true, "blkstrm.com/genuine")) {
         JADE_LOGW("User declined to sign attestation");
-        jade_process_reject_message(process, CBOR_RPC_USER_CANCELLED, "User declined to sign genuine check", NULL);
+        jade_process_reject_message(process, CBOR_RPC_USER_CANCELLED, "User declined to sign genuine check");
         goto cleanup;
     }
     JADE_LOGD("User pressed accept");
@@ -87,7 +91,7 @@ void sign_attestation_process(void* process_ptr)
 
     JADE_LOGI("Success");
 #else // CONFIG_IDF_TARGET_ESP32S3
-    jade_process_reject_message(process, CBOR_RPC_INTERNAL_ERROR, "Attestation not supported", NULL);
+    jade_process_reject_message(process, CBOR_RPC_INTERNAL_ERROR, "Attestation not supported");
 #endif // CONFIG_IDF_TARGET_ESP32S3
 
 cleanup:

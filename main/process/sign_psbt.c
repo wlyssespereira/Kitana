@@ -28,8 +28,8 @@
 #include "process_utils.h"
 
 bool show_btc_transaction_outputs_activity(
-    const network_t network_id, const struct wally_tx* tx, const output_info_t* output_info);
-bool show_btc_fee_confirmation_activity(const struct wally_tx* tx, const output_info_t* outinfo,
+    network_t network_id, const struct wally_tx* tx, const output_info_t* output_info);
+bool show_btc_fee_confirmation_activity(network_t network_id, const struct wally_tx* tx, const output_info_t* outinfo,
     script_flavour_t aggregate_inputs_scripts_flavour, uint64_t input_amount, uint64_t output_amount);
 
 // From https://github.com/bitcoin/bips/blob/master/bip-0174.mediawiki
@@ -810,7 +810,7 @@ int sign_psbt(const network_t network_id, struct wally_psbt* psbt, const char** 
     // User to agree fee amount
     // Check to see whether user accepted or declined
     if (!show_btc_fee_confirmation_activity(
-            tx, output_info, aggregate_inputs_scripts_flavour, input_amount, output_amount)) {
+            network_id, tx, output_info, aggregate_inputs_scripts_flavour, input_amount, output_amount)) {
         *errmsg = "User declined to sign psbt";
         retval = CBOR_RPC_USER_CANCELLED;
         goto cleanup;
@@ -947,7 +947,7 @@ void sign_psbt_process(void* process_ptr)
 
     if (network_is_liquid(network_id)) {
         jade_process_reject_message(
-            process, CBOR_RPC_BAD_PARAMETERS, "sign_psbt call not appropriate for liquid network", NULL);
+            process, CBOR_RPC_BAD_PARAMETERS, "sign_psbt call not appropriate for liquid network");
         goto cleanup;
     }
 
@@ -956,15 +956,14 @@ void sign_psbt_process(void* process_ptr)
     const uint8_t* psbt_bytes_in = NULL;
     rpc_get_bytes_ptr("psbt", &params, &psbt_bytes_in, &psbt_len_in);
     if (!psbt_bytes_in || !psbt_len_in) {
-        jade_process_reject_message(
-            process, CBOR_RPC_BAD_PARAMETERS, "Failed to extract psbt bytes from parameters", NULL);
+        jade_process_reject_message(process, CBOR_RPC_BAD_PARAMETERS, "Failed to extract psbt bytes from parameters");
         goto cleanup;
     }
 
     // Parse to wally structure
     struct wally_psbt* psbt = NULL;
     if (!deserialise_psbt(psbt_bytes_in, psbt_len_in, &psbt)) {
-        jade_process_reject_message(process, CBOR_RPC_BAD_PARAMETERS, "Failed to extract psbt from passed bytes", NULL);
+        jade_process_reject_message(process, CBOR_RPC_BAD_PARAMETERS, "Failed to extract psbt from passed bytes");
         goto cleanup;
     }
     jade_process_call_on_exit(process, jade_wally_free_psbt_wrapper, psbt);
@@ -973,7 +972,7 @@ void sign_psbt_process(void* process_ptr)
     const char* errmsg = NULL;
     const int errcode = sign_psbt(network_id, psbt, &errmsg);
     if (errcode) {
-        jade_process_reject_message(process, errcode, errmsg, NULL);
+        jade_process_reject_message(process, errcode, errmsg);
         goto cleanup;
     }
 
@@ -981,7 +980,7 @@ void sign_psbt_process(void* process_ptr)
     size_t psbt_len_out = 0;
     uint8_t* psbt_bytes_out = NULL;
     if (!serialise_psbt(psbt, &psbt_bytes_out, &psbt_len_out)) {
-        jade_process_reject_message(process, CBOR_RPC_INTERNAL_ERROR, "Failed to serialise sign psbt", NULL);
+        jade_process_reject_message(process, CBOR_RPC_INTERNAL_ERROR, "Failed to serialise sign psbt");
         goto cleanup;
     }
     jade_process_free_on_exit(process, psbt_bytes_out);
@@ -1009,7 +1008,7 @@ void sign_psbt_process(void* process_ptr)
             if (!IS_CURRENT_MESSAGE(process, "get_extended_data")) {
                 // Protocol error
                 jade_process_reject_message(
-                    process, CBOR_RPC_PROTOCOL_ERROR, "Unexpected message, expecting 'get_extended_data'", NULL);
+                    process, CBOR_RPC_PROTOCOL_ERROR, "Unexpected message, expecting 'get_extended_data'");
                 free(msgbuf);
                 goto cleanup;
             }
@@ -1019,7 +1018,7 @@ void sign_psbt_process(void* process_ptr)
             if (!check_extended_data_fields(&params, original_id, "sign_psbt", seqnum + 1, nmsgs)) {
                 // Protocol error
                 jade_process_reject_message(
-                    process, CBOR_RPC_PROTOCOL_ERROR, "Mismatched fields in 'get_extended_data' message", NULL);
+                    process, CBOR_RPC_PROTOCOL_ERROR, "Mismatched fields in 'get_extended_data' message");
                 free(msgbuf);
                 goto cleanup;
             }
